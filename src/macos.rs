@@ -264,6 +264,96 @@ pub fn apply_glass(ns_window: *mut c_void, radius: f64) -> &'static str {
     }
 }
 
+#[link(name = "QuartzCore", kind = "framework")]
+extern "C" {}
+
+/// Opening animation done by Core Animation on the whole window (glass included): a short
+/// spring from 94% scale plus a fade, like system popovers. Only fades with Reduce Motion on.
+/// Returns the layer frame before/after re-anchoring (diagnostics).
+pub fn animate_open(ns_window: *mut c_void) -> String {
+    unsafe {
+        let window = ns_window as Id;
+        let _: () = msg_send![window, setAlphaValue: 0.0f64];
+        let _: () = msg_send![class!(NSAnimationContext), beginGrouping];
+        let context: Id = msg_send![class!(NSAnimationContext), currentContext];
+        let _: () = msg_send![context, setDuration: 0.12f64];
+        let animator: Id = msg_send![window, animator];
+        let _: () = msg_send![animator, setAlphaValue: 1.0f64];
+        let _: () = msg_send![class!(NSAnimationContext), endGrouping];
+
+        let workspace: Id = msg_send![class!(NSWorkspace), sharedWorkspace];
+        let reduce: bool = msg_send![workspace, accessibilityDisplayShouldReduceMotion];
+        let content: Id = msg_send![window, contentView];
+        let layer: Id = msg_send![content, layer];
+        if reduce || layer.is_null() {
+            return "fade only".into();
+        }
+
+        // Scale around the centre: move the anchor there and compensate the position so the layer stays put.
+        let before: CGRect = msg_send![layer, frame];
+        let _: () = msg_send![layer, setAnchorPoint: CGPoint { x: 0.5, y: 0.5 }];
+        let moved: CGRect = msg_send![layer, frame];
+        let pos: CGPoint = msg_send![layer, position];
+        let fixed = CGPoint { x: pos.x + before.origin.x - moved.origin.x, y: pos.y + before.origin.y - moved.origin.y };
+        let _: () = msg_send![layer, setPosition: fixed];
+        let after: CGRect = msg_send![layer, frame];
+
+        let spring: Id = msg_send![class!(CASpringAnimation), animationWithKeyPath: ns_string("transform.scale")];
+        let from: Id = msg_send![class!(NSNumber), numberWithDouble: 0.94f64];
+        let to: Id = msg_send![class!(NSNumber), numberWithDouble: 1.0f64];
+        let _: () = msg_send![spring, setFromValue: from];
+        let _: () = msg_send![spring, setToValue: to];
+        let _: () = msg_send![spring, setMass: 1.0f64];
+        let _: () = msg_send![spring, setStiffness: 520.0f64];
+        let _: () = msg_send![spring, setDamping: 36.0f64];
+        let settle: f64 = msg_send![spring, settlingDuration];
+        let _: () = msg_send![spring, setDuration: settle];
+        let _: () = msg_send![layer, addAnimation: spring, forKey: ns_string("open")];
+
+        format!(
+            "before={:?} after={:?} settle={settle:.2}s",
+            (before.origin.x, before.origin.y, before.size.width, before.size.height),
+            (after.origin.x, after.origin.y, after.size.width, after.size.height)
+        )
+    }
+}
+
+/// Hands keyboard focus to another of our processes (the menu) right after a user click
+/// (macOS 14 cooperative activation); the menu then activates itself.
+pub fn yield_activation(pid: i32) {
+    unsafe {
+        let app: Id = msg_send![class!(NSRunningApplication), runningApplicationWithProcessIdentifier: pid];
+        let nsapp: Id = msg_send![class!(NSApplication), sharedApplication];
+        let can: bool = msg_send![nsapp, respondsToSelector: sel!(yieldActivationToApplication:)];
+        if !app.is_null() && can {
+            let _: () = msg_send![nsapp, yieldActivationToApplication: app];
+        }
+    }
+}
+
+pub fn activate_self() {
+    unsafe {
+        let nsapp: Id = msg_send![class!(NSApplication), sharedApplication];
+        let can: bool = msg_send![nsapp, respondsToSelector: sel!(activate)];
+        if can {
+            let _: () = msg_send![nsapp, activate];
+        }
+    }
+}
+
+/// Calls `f` whenever the user clicks in another app (closes the menu even if macOS
+/// declined to make it the active app). Lives for the rest of the process.
+pub fn on_click_outside(f: fn()) {
+    let block = block2::RcBlock::new(move |_event: *mut AnyObject| f());
+    // Left, right and other mouse down.
+    let mask: u64 = (1 << 1) | (1 << 3) | (1 << 25);
+    unsafe {
+        let monitor: Id = msg_send![class!(NSEvent), addGlobalMonitorForEventsMatchingMask: mask, handler: &*block];
+        let _ = monitor;
+    }
+    std::mem::forget(block);
+}
+
 /// Class names of a window's content subviews, back to front (debugging aid).
 pub fn subview_classes(ns_window: *mut c_void) -> Vec<String> {
     unsafe {
