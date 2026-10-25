@@ -194,6 +194,92 @@ pub fn base64(data: &[u8]) -> String {
     out
 }
 
+// MARK: - Liquid Glass
+
+/// Puts the system glass behind a window's content: `NSGlassEffectView` (Liquid Glass,
+/// macOS 26+, follows the user's Appearance settings) or the classic popover blur.
+/// Returns the class used, for diagnostics.
+pub fn apply_glass(ns_window: *mut c_void, radius: f64) -> &'static str {
+    unsafe {
+        let window = ns_window as Id;
+        let content: Id = msg_send![window, contentView];
+        if content.is_null() {
+            return "none";
+        }
+        let bounds: CGRect = msg_send![content, bounds];
+
+        // Pin the window and the existing views (the web view) to the system's light/dark mode.
+        // Liquid Glass adapts to whatever is behind it and would otherwise flip the page to the
+        // opposite scheme (dark text on dark glass).
+        let app: Id = msg_send![class!(NSApplication), sharedApplication];
+        let effective: Id = msg_send![app, effectiveAppearance];
+        let names: Id = msg_send![class!(NSArray), arrayWithObjects: [ns_string("NSAppearanceNameAqua"), ns_string("NSAppearanceNameDarkAqua")].as_ptr(), count: 2usize];
+        let best: Id = msg_send![effective, bestMatchFromAppearancesWithNames: names];
+        if !best.is_null() {
+            let appearance: Id = msg_send![class!(NSAppearance), appearanceNamed: best];
+            let _: () = msg_send![window, setAppearance: appearance];
+            let subviews: Id = msg_send![content, subviews];
+            let count: usize = msg_send![subviews, count];
+            for i in 0..count {
+                let v: Id = msg_send![subviews, objectAtIndex: i];
+                let _: () = msg_send![v, setAppearance: appearance];
+            }
+        }
+
+        let glass_class = objc2::runtime::AnyClass::get("NSGlassEffectView");
+        let (view, name): (Id, &'static str) = if let Some(cls) = glass_class {
+            let v: Id = msg_send![cls, alloc];
+            let v: Id = msg_send![v, initWithFrame: bounds];
+            let _: () = msg_send![v, setCornerRadius: radius];
+            let _: () = msg_send![v, setStyle: 0isize]; // regular: honours the system's clear/tinted setting
+            // The glass draws its own edge and depth; a window shadow would trace the square window frame.
+            let _: () = msg_send![window, setHasShadow: false];
+            (v, "NSGlassEffectView")
+        } else {
+            let v: Id = msg_send![class!(NSVisualEffectView), alloc];
+            let v: Id = msg_send![v, initWithFrame: bounds];
+            let _: () = msg_send![v, setMaterial: 6isize]; // popover
+            let _: () = msg_send![v, setBlendingMode: 0isize]; // behind window
+            let _: () = msg_send![v, setState: 1isize]; // active
+            let _: () = msg_send![v, setWantsLayer: true];
+            let layer: Id = msg_send![v, layer];
+            let _: () = msg_send![layer, setCornerRadius: radius];
+            let _: () = msg_send![layer, setMasksToBounds: true];
+            (v, "NSVisualEffectView")
+        };
+        let _: () = msg_send![view, setAutoresizingMask: 18usize]; // width + height sizable
+        // Below everything else (the transparent web view sits on top of it).
+        let _: () = msg_send![content, addSubview: view, positioned: -1isize, relativeTo: std::ptr::null_mut::<AnyObject>()];
+        let _: () = msg_send![view, release];
+        // Clip the whole window to the glass shape: nothing (shadow, halo, square corners) renders outside it.
+        let _: () = msg_send![content, setWantsLayer: true];
+        let clip: Id = msg_send![content, layer];
+        let _: () = msg_send![clip, setCornerRadius: radius];
+        let _: () = msg_send![clip, setCornerCurve: ns_string("continuous")];
+        let _: () = msg_send![clip, setMasksToBounds: true];
+        let _: () = msg_send![window, setOpaque: false];
+        let clear: Id = msg_send![class!(NSColor), clearColor];
+        let _: () = msg_send![window, setBackgroundColor: clear];
+        name
+    }
+}
+
+/// Class names of a window's content subviews, back to front (debugging aid).
+pub fn subview_classes(ns_window: *mut c_void) -> Vec<String> {
+    unsafe {
+        let content: Id = msg_send![ns_window as Id, contentView];
+        let subviews: Id = msg_send![content, subviews];
+        let count: usize = msg_send![subviews, count];
+        (0..count)
+            .map(|i| {
+                let v: Id = msg_send![subviews, objectAtIndex: i];
+                let f: CGRect = msg_send![v, frame];
+                format!("{} {}x{}@{},{}", (*v).class().name(), f.size.width, f.size.height, f.origin.x, f.origin.y)
+            })
+            .collect()
+    }
+}
+
 // MARK: - HUD
 
 /// Native toast near the bottom of the screen, like the volume HUD. One panel, reused.
