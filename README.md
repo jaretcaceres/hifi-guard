@@ -4,6 +4,12 @@ A tiny macOS menu bar app that keeps your headset out of Bluetooth **call mode**
 
 When any app (Discord, Zoom, a browser…) opens a Bluetooth headset's microphone, macOS switches the headset from A2DP (stereo, 44.1/48 kHz) to the hands-free profile (HFP: mono, 16 kHz). Everything starts sounding like a phone call. HiFi Guard stops that from happening by routing audio sensibly, automatically.
 
+<p align="center">
+  <img src="docs/estado.png" width="300" alt="Status tab: the A50 headset stays on A2DP stereo at 44.1 kHz while the Mac's built-in mic is used">
+  <img src="docs/prioridad.png" width="300" alt="Priority tab: ordered output and input devices, the Bluetooth mic marked as blocked">
+  <img src="docs/ajustes.png" width="300" alt="Settings tab: prefer USB, block Bluetooth mic, automatic switching, highest sample rate, HUD, launch at login">
+</p>
+
 ## What it does
 
 - **Headsets with a USB base or dongle** (e.g. Logitech A50: `A50 Game` / `A50 Mic`): output and mic go through USB at full quality instead of the Bluetooth link.
