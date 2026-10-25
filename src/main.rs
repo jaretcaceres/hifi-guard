@@ -1,2 +1,3 @@
+mod audio;
 
 fn main() {}
