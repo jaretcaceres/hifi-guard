@@ -194,3 +194,128 @@ pub fn base64(data: &[u8]) -> String {
     out
 }
 
+// MARK: - HUD
+
+/// Native toast near the bottom of the screen, like the volume HUD. One panel, reused.
+pub struct Hud {
+    panel: Id,
+    icon: Id,
+    title: Id,
+}
+
+impl Hud {
+    pub fn new() -> Self {
+        unsafe {
+            let rect = CGRect { origin: CGPoint { x: 0.0, y: 0.0 }, size: CGSize { width: 300.0, height: 60.0 } };
+            let panel: Id = msg_send![class!(NSPanel), alloc];
+            // Borderless (0) | non-activating panel (1 << 7).
+            let panel: Id = msg_send![panel, initWithContentRect: rect, styleMask: 1usize << 7, backing: 2usize, defer: true];
+            let _: () = msg_send![panel, setLevel: 25isize]; // status bar level
+            let _: () = msg_send![panel, setOpaque: false];
+            let clear: Id = msg_send![class!(NSColor), clearColor];
+            let _: () = msg_send![panel, setBackgroundColor: clear];
+            let _: () = msg_send![panel, setHasShadow: true];
+            let _: () = msg_send![panel, setIgnoresMouseEvents: true];
+            let _: () = msg_send![panel, setReleasedWhenClosed: false];
+            // canJoinAllSpaces | stationary | fullScreenAuxiliary
+            let _: () = msg_send![panel, setCollectionBehavior: (1usize << 0) | (1usize << 4) | (1usize << 8)];
+
+            // Labels live in `blur`, a plain container; Liquid Glass (or the HUD blur) sits behind it.
+            let blur: Id = msg_send![class!(NSView), alloc];
+            let blur: Id = msg_send![blur, initWithFrame: rect];
+            let _: () = msg_send![blur, setAutoresizingMask: 18usize];
+            if let Some(cls) = objc2::runtime::AnyClass::get("NSGlassEffectView") {
+                let glass: Id = msg_send![cls, alloc];
+                let glass: Id = msg_send![glass, initWithFrame: rect];
+                let _: () = msg_send![glass, setCornerRadius: 30.0f64]; // pill, like the system HUDs
+                let _: () = msg_send![glass, setStyle: 0isize];
+                let _: () = msg_send![glass, setContentView: blur];
+                let _: () = msg_send![panel, setContentView: glass];
+            } else {
+                let effect: Id = msg_send![class!(NSVisualEffectView), alloc];
+                let effect: Id = msg_send![effect, initWithFrame: rect];
+                let _: () = msg_send![effect, setMaterial: 13isize]; // HUD window
+                let _: () = msg_send![effect, setState: 1isize]; // active
+                let _: () = msg_send![effect, setBlendingMode: 0isize]; // behind window
+                let _: () = msg_send![effect, setWantsLayer: true];
+                let layer: Id = msg_send![effect, layer];
+                let _: () = msg_send![layer, setCornerRadius: 18.0f64];
+                let _: () = msg_send![layer, setMasksToBounds: true];
+                let _: () = msg_send![effect, addSubview: blur];
+                let _: () = msg_send![panel, setContentView: effect];
+            }
+
+            let icon: Id = msg_send![class!(NSImageView), alloc];
+            let icon: Id = msg_send![icon, initWithFrame: CGRect { origin: CGPoint { x: 16.0, y: 14.0 }, size: CGSize { width: 32.0, height: 32.0 } }];
+            let white: Id = msg_send![class!(NSColor), labelColor];
+            let _: () = msg_send![icon, setContentTintColor: white];
+            let _: () = msg_send![blur, addSubview: icon];
+
+            let title: Id = msg_send![class!(NSTextField), labelWithString: ns_string("")];
+            let font: Id = msg_send![class!(NSFont), systemFontOfSize: 14.0f64, weight: 0.3f64];
+            let _: () = msg_send![title, setFont: font];
+            let _: () = msg_send![title, setTextColor: white];
+            let _: () = msg_send![blur, addSubview: title];
+
+            let caption: Id = msg_send![class!(NSTextField), labelWithString: ns_string("HiFi Guard")];
+            let small: Id = msg_send![class!(NSFont), systemFontOfSize: 11.0f64, weight: 0.23f64];
+            let gray: Id = msg_send![class!(NSColor), secondaryLabelColor];
+            let _: () = msg_send![caption, setFont: small];
+            let _: () = msg_send![caption, setTextColor: gray];
+            let _: () = msg_send![caption, setFrameOrigin: CGPoint { x: 60.0, y: 32.0 }];
+            let _: () = msg_send![caption, sizeToFit];
+            let _: () = msg_send![blur, addSubview: caption];
+
+            Hud { panel, icon, title }
+        }
+    }
+
+    pub fn show(&self, text: &str, symbol: &str) {
+        unsafe {
+            let _: () = msg_send![self.title, setStringValue: ns_string(text)];
+            let _: () = msg_send![self.title, sizeToFit];
+            let _: () = msg_send![self.title, setFrameOrigin: CGPoint { x: 60.0, y: 12.0 }];
+            let size: CGSize = msg_send![self.title, fittingSize];
+
+            let image: Id = msg_send![class!(NSImage), imageWithSystemSymbolName: ns_string(symbol), accessibilityDescription: std::ptr::null_mut::<AnyObject>()];
+            if !image.is_null() {
+                let config: Id = msg_send![class!(NSImageSymbolConfiguration), configurationWithPointSize: 22.0f64, weight: 0.3f64];
+                let image: Id = msg_send![image, imageWithSymbolConfiguration: config];
+                let _: () = msg_send![self.icon, setImage: image];
+            }
+
+            let width = (60.0 + size.width + 22.0).max(220.0);
+            let screen: Id = msg_send![class!(NSScreen), mainScreen];
+            let visible: CGRect = if screen.is_null() {
+                CGRect { origin: CGPoint { x: 0.0, y: 0.0 }, size: CGSize { width: 1440.0, height: 900.0 } }
+            } else {
+                msg_send![screen, visibleFrame]
+            };
+            let frame = CGRect {
+                origin: CGPoint { x: visible.origin.x + (visible.size.width - width) / 2.0, y: visible.origin.y + 90.0 },
+                size: CGSize { width, height: 60.0 },
+            };
+            let _: () = msg_send![self.panel, setFrame: frame, display: true];
+            let visible_now: bool = msg_send![self.panel, isVisible];
+            if !visible_now {
+                let _: () = msg_send![self.panel, setAlphaValue: 0.0f64];
+            }
+            let _: () = msg_send![self.panel, orderFrontRegardless];
+            let animator: Id = msg_send![self.panel, animator];
+            let _: () = msg_send![animator, setAlphaValue: 1.0f64];
+        }
+    }
+
+    pub fn fade_out(&self) {
+        unsafe {
+            let animator: Id = msg_send![self.panel, animator];
+            let _: () = msg_send![animator, setAlphaValue: 0.0f64];
+        }
+    }
+
+    pub fn order_out(&self) {
+        unsafe {
+            let _: () = msg_send![self.panel, orderOut: std::ptr::null_mut::<AnyObject>()];
+        }
+    }
+}
