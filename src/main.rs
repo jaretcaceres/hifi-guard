@@ -291,7 +291,7 @@ fn main() {
         }
 
         if changed {
-            if let Some((text, kind)) = engine.announcements.drain(..).last() {
+            if let Some((text, kind)) = engine.announcements.drain(..).next_back() {
                 if let Some(h) = &hud {
                     h.show(&text, symbol(kind));
                     hud_fade_at = Some(now + HUD_TIME);
