@@ -42,6 +42,7 @@ pub const T_BLUETOOTH: u32 = fourcc(b"blue");
 pub const T_BLUETOOTH_LE: u32 = fourcc(b"blea");
 pub const T_HDMI: u32 = fourcc(b"hdmi");
 pub const T_DISPLAYPORT: u32 = fourcc(b"dprt");
+pub const T_AIRPLAY: u32 = fourcc(b"airp");
 
 #[repr(C)]
 #[derive(Clone, Copy)]

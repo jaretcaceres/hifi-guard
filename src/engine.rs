@@ -551,7 +551,12 @@ fn link_label(d: Option<&Device>) -> String {
 }
 
 /// "A50" ~ "A50 Game" ~ "A50 Mic": one name prefixes the other, or same first word.
+/// A shared brand or owner isn't enough: "Sony WH-1000XM5" isn't "SONY TV" and
+/// "Jaret's AirPods" isn't "Jaret's iPhone Microphone".
 fn same_family(a: &Device, b: &Device) -> bool {
+    if [a, b].iter().any(|d| matches!(d.transport, audio::T_HDMI | audio::T_DISPLAYPORT | audio::T_AIRPLAY)) {
+        return false;
+    }
     let (x, y) = (a.name.to_lowercase(), b.name.to_lowercase());
     let (short, long) = if x.len() <= y.len() { (&x, &y) } else { (&y, &x) };
     if short.chars().count() < 2 {
@@ -561,11 +566,205 @@ fn same_family(a: &Device, b: &Device) -> bool {
         return true;
     }
     let first = |s: &str| s.split(' ').next().unwrap_or(s).to_string();
-    first(&x) == first(&y) && first(&x).chars().count() >= 2
+    let owner = first(&x).ends_with("'s") || first(&x).ends_with("’s");
+    first(&x) == first(&y) && first(&x).chars().count() >= 2 && !owner
 }
 
 /// Stream/monitor mixes show up as inputs but aren't microphones.
 fn is_loopback(d: &Device) -> bool {
     let name = d.name.to_lowercase();
     ["stream", "loopback", "monitor"].iter().any(|w| name.contains(w))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::audio::{T_AGGREGATE, T_AIRPLAY, T_BLUETOOTH, T_BUILTIN, T_DISPLAYPORT, T_HDMI, T_USB, T_VIRTUAL};
+
+    fn dev(id: u32, name: &str, transport: u32, inputs: u32, outputs: u32) -> Device {
+        Device { id, uid: format!("uid-{id}"), name: name.into(), transport, inputs, outputs, rate: 48_000.0 }
+    }
+
+    /// Built by hand: `Engine::new` would read the real config and audio hardware.
+    fn engine(devices: Vec<Device>) -> Engine {
+        Engine {
+            cfg: Config::default(),
+            devices,
+            output: None,
+            input: None,
+            known: HashSet::new(),
+            needs_priority: false,
+            bt_mic_apps: Vec::new(),
+            last_action: None,
+            fix_count: 0,
+            announcements: Vec::new(),
+        }
+    }
+
+    fn names(list: Vec<&Device>) -> Vec<&str> {
+        list.into_iter().map(|d| d.name.as_str()).collect()
+    }
+
+    fn a50_setup() -> Vec<Device> {
+        vec![
+            dev(1, "MacBook Pro Speakers", T_BUILTIN, 0, 2),
+            dev(2, "MacBook Pro Microphone", T_BUILTIN, 1, 0),
+            dev(3, "A50", T_BLUETOOTH, 1, 2),
+            dev(4, "A50 Game", T_USB, 0, 2),
+            dev(5, "A50 Mic", T_USB, 1, 0),
+        ]
+    }
+
+    #[test]
+    fn family_matches_prefix_and_shared_first_word() {
+        let bt = dev(1, "A50", T_BLUETOOTH, 1, 2);
+        assert!(same_family(&bt, &dev(2, "A50 Game", T_USB, 0, 2)));
+        assert!(same_family(&dev(2, "A50 Game", T_USB, 0, 2), &dev(3, "a50 mic", T_USB, 1, 0)));
+        assert!(!same_family(&bt, &dev(4, "MacBook Pro Speakers", T_BUILTIN, 0, 2)));
+    }
+
+    #[test]
+    fn family_ignores_too_short_names() {
+        assert!(!same_family(&dev(1, "X", T_BLUETOOTH, 1, 2), &dev(2, "X Game", T_USB, 0, 2)));
+    }
+
+    #[test]
+    fn family_ignores_owner_name_in_device_names() {
+        let airpods = dev(1, "Jaret’s AirPods Pro", T_BLUETOOTH, 1, 2);
+        assert!(!same_family(&airpods, &dev(2, "Jaret’s iPhone Microphone", 0, 1, 0)));
+        assert!(!same_family(&dev(3, "Jaret's AirPods", T_BLUETOOTH, 1, 2), &dev(4, "Jaret's iPad", 0, 1, 0)));
+        assert!(same_family(&dev(3, "Jaret's AirPods", T_BLUETOOTH, 1, 2), &dev(5, "Jaret's AirPods Pro", T_USB, 1, 0)));
+    }
+
+    #[test]
+    fn family_excludes_displays_and_airplay_from_the_same_brand() {
+        let headset = dev(1, "Sony WH-1000XM5", T_BLUETOOTH, 1, 2);
+        assert!(!same_family(&headset, &dev(2, "SONY TV", T_HDMI, 0, 2)));
+        assert!(!same_family(&headset, &dev(3, "Sony Monitor", T_DISPLAYPORT, 0, 2)));
+        assert!(!same_family(&headset, &dev(4, "Sony Bravia", T_AIRPLAY, 0, 2)));
+    }
+
+    #[test]
+    fn twins_route_a_bluetooth_headset_to_its_usb_base() {
+        let e = engine(a50_setup());
+        let bt = e.devices[2].clone();
+        assert_eq!(e.output_twin(&bt).map(|d| d.name), Some("A50 Game".to_string()));
+        assert_eq!(e.input_twin(&bt).map(|d| d.name), Some("A50 Mic".to_string()));
+    }
+
+    #[test]
+    fn input_twin_skips_stream_mixes() {
+        let e = engine(vec![dev(1, "A50", T_BLUETOOTH, 1, 2), dev(2, "A50 Stream", T_USB, 2, 0)]);
+        assert!(e.input_twin(&e.devices[0]).is_none());
+    }
+
+    #[test]
+    fn auto_pick_prefers_the_wired_headset() {
+        let e = engine(a50_setup());
+        assert_eq!(e.auto_pick(false).map(|d| d.name), Some("A50 Game".to_string()));
+        assert_eq!(e.auto_pick(true).map(|d| d.name), Some("A50 Mic".to_string()));
+    }
+
+    #[test]
+    fn auto_pick_never_selects_a_blocked_bluetooth_mic() {
+        let e = engine(vec![dev(1, "AirPods Pro", T_BLUETOOTH, 1, 2)]);
+        assert!(e.auto_pick(true).is_none());
+    }
+
+    #[test]
+    fn pinned_bluetooth_mic_is_still_refused_while_blocked() {
+        let mut e = engine(vec![dev(1, "AirPods Pro", T_BLUETOOTH, 1, 2), dev(2, "MacBook Pro Microphone", T_BUILTIN, 1, 0)]);
+        e.cfg.input_priority = vec!["uid-1".into(), "uid-2".into()];
+        assert_eq!(e.auto_pick(true).map(|d| d.name), Some("MacBook Pro Microphone".to_string()));
+    }
+
+    #[test]
+    fn auto_pick_skips_virtual_devices_unless_pinned() {
+        let mut e = engine(vec![dev(1, "BlackHole 2ch", T_VIRTUAL, 2, 2), dev(2, "MacBook Pro Speakers", T_BUILTIN, 0, 2)]);
+        assert_eq!(e.auto_pick(false).map(|d| d.name), Some("MacBook Pro Speakers".to_string()));
+        e.cfg.output_priority = vec!["uid-1".into()];
+        assert_eq!(e.auto_pick(false).map(|d| d.name), Some("BlackHole 2ch".to_string()));
+    }
+
+    #[test]
+    fn fallback_mic_is_never_bluetooth_virtual_or_loopback() {
+        let e = engine(vec![
+            dev(1, "AirPods Pro", T_BLUETOOTH, 1, 2),
+            dev(2, "BlackHole 2ch", T_VIRTUAL, 2, 2),
+            dev(3, "Loopback Audio", T_USB, 2, 0),
+            dev(4, "MacBook Pro Microphone", T_BUILTIN, 1, 0),
+        ]);
+        assert_eq!(e.fallback_mic().map(|d| d.name), Some("MacBook Pro Microphone".to_string()));
+    }
+
+    #[test]
+    fn user_priority_overrides_default_ranking() {
+        let mut e = engine(a50_setup());
+        e.cfg.output_priority = vec!["uid-1".into()];
+        assert_eq!(names(e.outputs())[0], "MacBook Pro Speakers");
+    }
+
+    #[test]
+    fn prefer_wired_ranks_bluetooth_below_its_twin() {
+        let mut e = engine(a50_setup());
+        assert_eq!(names(e.outputs())[..2], ["A50 Game", "A50"]);
+        e.cfg.prefer_wired = false;
+        assert_eq!(names(e.outputs())[..2], ["A50", "A50 Game"]);
+    }
+
+    #[test]
+    fn aggregate_devices_are_hidden_from_both_lists() {
+        let e = engine(vec![dev(1, "Aggregate", T_AGGREGATE, 2, 2), dev(2, "MacBook Pro Speakers", T_BUILTIN, 0, 2)]);
+        assert_eq!(names(e.outputs()), ["MacBook Pro Speakers"]);
+        assert!(e.inputs().is_empty());
+    }
+
+    #[test]
+    fn promote_moves_the_device_to_the_top() {
+        let mut e = engine(a50_setup());
+        let speakers = e.devices[0].clone();
+        e.promote(&speakers, false);
+        assert_eq!(e.cfg.output_priority[0], "uid-1");
+        assert_eq!(e.cfg.output_priority.iter().filter(|u| *u == "uid-1").count(), 1);
+    }
+
+    #[test]
+    fn call_mode_means_bluetooth_at_a_low_sample_rate() {
+        let mut d = dev(1, "AirPods Pro", T_BLUETOOTH, 1, 2);
+        d.rate = 16_000.0;
+        assert!(d.is_call_mode());
+        d.rate = 44_100.0;
+        assert!(!d.is_call_mode());
+        let mut usb = dev(2, "USB Mic", T_USB, 1, 0);
+        usb.rate = 16_000.0;
+        assert!(!usb.is_call_mode());
+    }
+
+    #[test]
+    fn app_holding_the_mic_is_only_flagged_when_it_isnt_the_default() {
+        let bt = dev(1, "AirPods Pro", T_BLUETOOTH, 1, 2);
+        let mut e = engine(vec![bt.clone()]);
+        e.bt_mic_apps = vec!["Discord".into()];
+        e.input = Some(dev(2, "MacBook Pro Microphone", T_BUILTIN, 1, 0));
+        assert!(e.app_holds_bt_mic());
+        e.input = Some(bt);
+        assert!(!e.app_holds_bt_mic());
+    }
+
+    #[test]
+    fn missing_config_fields_fall_back_to_defaults() {
+        let cfg: Config = serde_json::from_str(r#"{ "enabled": false }"#).unwrap();
+        assert!(!cfg.enabled);
+        assert!(cfg.block_bt_mic && cfg.prefer_wired);
+        assert!(cfg.output_priority.is_empty());
+    }
+
+    #[test]
+    fn link_label_reports_the_real_bluetooth_profile() {
+        let mut d = dev(1, "AirPods Pro", T_BLUETOOTH, 1, 2);
+        assert_eq!(link_label(Some(&d)), "A2DP");
+        d.rate = 16_000.0;
+        assert_eq!(link_label(Some(&d)), "HFP");
+        assert_eq!(link_label(None), "—");
+    }
 }
