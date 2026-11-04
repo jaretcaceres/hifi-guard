@@ -1,6 +1,10 @@
 # HiFi Guard
 
+**Bluetooth headphones sounding like a phone call on your Mac? HiFi Guard stops it.**
+
 A tiny macOS menu bar app that keeps your headset out of Bluetooth **call mode**.
+
+Your music or game audio turns muffled and mono the moment you join Discord, Zoom or a browser call. That's this problem, and it isn't your headphones.
 
 When any app (Discord, Zoom, a browser…) opens a Bluetooth headset's microphone, macOS switches the headset from A2DP (stereo, 44.1/48 kHz) to the hands-free profile (HFP: mono, 16 kHz). Everything starts sounding like a phone call. HiFi Guard stops that from happening by routing audio sensibly, automatically.
 
@@ -9,6 +13,16 @@ When any app (Discord, Zoom, a browser…) opens a Bluetooth headset's microphon
   <img src="docs/prioridad.png" width="300" alt="Priority tab: ordered output and input devices, the Bluetooth mic marked as blocked">
   <img src="docs/ajustes.png" width="300" alt="Settings tab: prefer USB, block Bluetooth mic, automatic switching, highest sample rate, HUD, launch at login">
 </p>
+
+## Install
+
+Requires macOS 14 or later, on Apple silicon or Intel. The menu is in Spanish for now.
+
+1. Download `HiFi-Guard-<version>.zip` from [Releases](https://github.com/jaretcaceres/hifi-guard/releases/latest).
+2. Unzip it and move **HiFi Guard** to Applications.
+3. Open it. It lives in the menu bar and has no Dock icon.
+
+If macOS says it can't verify the app, the release isn't notarized yet. Go to **System Settings → Privacy & Security** and choose **Open Anyway**, or [build it yourself](#build).
 
 ## What it does
 
@@ -29,18 +43,35 @@ Bluetooth Classic has no profile that carries stereo audio *and* a microphone at
 
 - **No polling.** It talks to Core Audio directly and sleeps until the system reports a change (devices, defaults, Bluetooth profile switches, apps opening a mic): ~0% CPU when idle.
 - **~15 MB resident.** The menu runs in a separate short-lived process (`hifiguard --menu`), pre-rendered while the pointer is over the menu bar icon and gone when it closes, together with its WebKit helpers.
-- **~1 MB binary**, written in Rust.
+- **~1 MB per architecture**, written in Rust.
 
 ## Build
 
 Requires macOS 14+ (Liquid Glass on macOS 26+) and a Rust toolchain.
 
 ```bash
-./build.sh            # builds target/HiFi Guard.app
-./build.sh --install  # replaces /Applications/HiFi Guard.app and launches it
+./build.sh              # builds target/HiFi Guard.app
+./build.sh --install    # replaces /Applications/HiFi Guard.app and launches it
+./build.sh --universal  # builds for Apple silicon and Intel
+cargo test              # routing policy tests; no audio hardware needed
 ```
 
-The bundle is ad-hoc signed. To distribute it, sign it with a Developer ID and notarize it.
+Local builds are ad-hoc signed. Set `HIFIGUARD_SIGN_IDENTITY` to a Developer ID to sign for distribution.
+
+## Releasing
+
+Set the version in `Cargo.toml`, then push a matching tag such as `v2.0.0`. The release workflow runs the tests, builds a universal app and creates a draft GitHub release.
+
+Without Apple credentials the build is ad-hoc signed. To sign and notarize it, and to generate the Homebrew cask, add these repository secrets:
+
+| Secret | What |
+| --- | --- |
+| `APPLE_CERTIFICATE_P12` | Developer ID Application certificate, as base64 |
+| `APPLE_CERTIFICATE_PASSWORD` | Password of that `.p12` file |
+| `APPLE_SIGN_IDENTITY` | Identity name, e.g. `Developer ID Application: Name (TEAMID)` |
+| `APPLE_ID` | Apple account email |
+| `APPLE_TEAM_ID` | Developer team ID |
+| `APPLE_APP_PASSWORD` | App-specific password for that account |
 
 ## Project layout
 
@@ -53,6 +84,8 @@ The bundle is ad-hoc signed. To distribute it, sign it with a Developer ID and n
 | `src/main.rs` | Resident app: menu bar icon, hotkey, event loop |
 | `ui/index.html` | Menu UI |
 | `tools/` | Dev scripts: menu bar icons, app icon, audio routing inspection |
+| `packaging/` | Homebrew cask template, filled in by the release workflow |
+| `.github/workflows/` | CI and releases |
 
 Development flags: `--open` opens the menu at launch, `--hud` shows a sample HUD, `--state` prints the menu state as JSON. Environment: `HIFIGUARD_DEBUG=1` prints timing and view diagnostics from the menu process, `HIFIGUARD_PIN=1` keeps the menu open without focus and `HIFIGUARD_TAB=0|1|2` opens it on a tab (handy for screenshots).
 
