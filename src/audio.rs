@@ -174,11 +174,11 @@ impl Device {
             T_BLUETOOTH => "Bluetooth",
             T_BLUETOOTH_LE => "Bluetooth LE",
             T_USB => "USB",
-            T_BUILTIN => "Integrado",
+            T_BUILTIN => "Built-in",
             T_VIRTUAL => "Virtual",
-            T_AGGREGATE => "Agregado",
-            T_HDMI | T_DISPLAYPORT => "Pantalla",
-            _ => "Otro",
+            T_AGGREGATE => "Aggregate",
+            T_HDMI | T_DISPLAYPORT => "Display",
+            _ => "Other",
         }
     }
 }

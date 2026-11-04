@@ -169,7 +169,7 @@ impl Engine {
     pub fn toggle(&mut self) {
         self.cfg.enabled = !self.cfg.enabled;
         self.cfg.save();
-        let msg = if self.cfg.enabled { "HiFi Guard activado" } else { "HiFi Guard desactivado" };
+        let msg = if self.cfg.enabled { "HiFi Guard on" } else { "HiFi Guard off" };
         let kind = self.kind(self.output.as_ref());
         self.announce(msg.into(), kind);
         if self.cfg.enabled {
@@ -281,13 +281,13 @@ impl Engine {
             self.needs_priority = false;
             if let Some(best) = self.auto_pick(false).filter(|b| Some(b.id) != self.output.as_ref().map(|o| o.id)) {
                 self.set_output(&best);
-                self.announce(format!("Sonido → {}", best.name), self.kind(Some(&best)));
+                self.announce(format!("Output → {}", best.name), self.kind(Some(&best)));
             }
             self.refresh();
             self.needs_priority = false;
             if let Some(best) = self.auto_pick(true).filter(|b| Some(b.id) != self.input.as_ref().map(|i| i.id)) {
                 audio::set_default(best.id, true);
-                self.announce(format!("Micro → {}", best.name), self.kind(Some(&best)));
+                self.announce(format!("Mic → {}", best.name), self.kind(Some(&best)));
             }
             self.refresh();
             self.needs_priority = false;
@@ -298,7 +298,7 @@ impl Engine {
             if let Some(out) = self.output.clone().filter(Device::is_bluetooth) {
                 if let Some(twin) = self.output_twin(&out) {
                     self.set_output(&twin);
-                    self.announce(format!("Sonido → {} por {}", twin.name, twin.transport_label()), self.kind(Some(&twin)));
+                    self.announce(format!("Output → {} via {}", twin.name, twin.transport_label()), self.kind(Some(&twin)));
                     self.refresh();
                 }
             }
@@ -315,7 +315,7 @@ impl Engine {
                     .or_else(|| self.cfg.block_bt_mic.then(|| self.fallback_mic()).flatten());
                 if let Some(target) = target {
                     if audio::set_default(target.id, true) {
-                        self.announce(format!("Modo llamada evitado · micro → {}", target.name), self.kind(Some(&target)));
+                        self.announce(format!("Call mode avoided · mic → {}", target.name), self.kind(Some(&target)));
                     }
                 }
                 self.refresh();
@@ -516,6 +516,7 @@ impl Engine {
     pub fn state_json(&self) -> Value {
         let last = self.last_action.as_ref().map(|(m, t)| json!({ "text": m, "ago": t.elapsed().as_secs() }));
         json!({
+            "version": env!("CARGO_PKG_VERSION"),
             "enabled": self.cfg.enabled,
             "callMode": self.is_call_mode(),
             "appHoldsBtMic": self.app_holds_bt_mic(),

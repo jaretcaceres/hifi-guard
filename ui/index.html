@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -209,18 +209,18 @@
   <header>
     <div class="logo" id="logo"></div>
     <div class="title"><b>HiFi Guard</b><div class="status"><span class="dot" id="dot"></span><span id="statusText"></span></div></div>
-    <button class="switch" id="master" aria-label="Activar HiFi Guard"></button>
+    <button class="switch" id="master" aria-label="Turn HiFi Guard on or off"></button>
   </header>
 
   <div class="seg" id="tabs">
     <div class="pill"></div>
-    <button data-tab="0" class="on">Estado</button><button data-tab="1">Prioridad</button><button data-tab="2">Ajustes</button>
+    <button data-tab="0" class="on">Status</button><button data-tab="1">Priority</button><button data-tab="2">Settings</button>
   </div>
 
   <main id="main">
     <section class="pane on" id="p0">
       <div class="hero card" id="hero">
-        <div class="side"><img class="mac" id="macImg" alt=""><span>Este Mac</span></div>
+        <div class="side"><img class="mac" id="macImg" alt=""><span>This Mac</span></div>
         <div class="lanes">
           <span class="tag" id="outTag"></span>
           <div class="lane" id="outLane"><i></i><i></i><i></i></div>
@@ -237,29 +237,29 @@
       <div id="alert"></div>
       <div class="mode card" id="mode">
         <div class="pill"></div>
-        <button data-call="0"><span class="ic" id="mHifi"></span><span><b>Hi-Fi</b><small>Máxima calidad</small></span></button>
-        <button data-call="1"><span class="ic" id="mCall"></span><span><b>Llamada</b><small>Micro de los cascos</small></span></button>
+        <button data-call="0"><span class="ic" id="mHifi"></span><span><b>Hi-Fi</b><small>Best quality</small></span></button>
+        <button data-call="1"><span class="ic" id="mCall"></span><span><b>Call</b><small>Headset mic</small></span></button>
       </div>
       <div class="card" id="outBox"><button class="row" id="outRow" data-list="out"></button><div class="drop"><div><div class="list" id="outList"></div></div></div></div>
       <div class="card" id="inBox"><button class="row" id="inRow" data-list="in"></button><div class="drop"><div><div class="list" id="inList"></div></div></div></div>
     </section>
 
     <section class="pane" id="p1">
-      <p class="hint">Al conectar o desconectar algo, HiFi Guard elige el primero disponible de cada lista. El micro Bluetooth nunca se elige solo.</p>
-      <div class="label">Sonido</div><div class="plist card" id="pOut"></div>
-      <div class="label">Micro</div><div class="plist card" id="pIn"></div>
-      <div class="bar"><label><button class="switch" data-opt="auto_priority"></button>Cambio automático</label><button class="btn" id="reset">Restablecer</button></div>
+      <p class="hint">When something is plugged in or out, HiFi Guard picks the first available device from each list. The Bluetooth mic is never picked automatically.</p>
+      <div class="label">Output</div><div class="plist card" id="pOut"></div>
+      <div class="label">Mic</div><div class="plist card" id="pIn"></div>
+      <div class="bar"><label><button class="switch" data-opt="auto_priority"></button>Auto switch</label><button class="btn" id="reset">Reset</button></div>
     </section>
 
     <section class="pane" id="p2">
       <div class="card" id="g1"></div>
       <div class="card" id="g2"></div>
-      <div class="card"><div class="set"><span class="meta"><b>Activar o desactivar</b></span><span class="keys"><kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>H</kbd></span></div></div>
-      <div class="meta2"><span id="fixes"></span><span>v2.1</span></div>
+      <div class="card"><div class="set"><span class="meta"><b>Turn on or off</b></span><span class="keys"><kbd>⌃</kbd><kbd>⌥</kbd><kbd>⌘</kbd><kbd>H</kbd></span></div></div>
+      <div class="meta2"><span id="fixes"></span><span id="version"></span></div>
     </section>
   </main>
 
-  <footer><span class="msg" id="footMsg"></span><button class="quit" id="quit" title="Salir de HiFi Guard"></button></footer>
+  <footer><span class="msg" id="footMsg"></span><button class="quit" id="quit" title="Quit HiFi Guard"></button></footer>
 </div>
 
 <script>
@@ -307,8 +307,8 @@ function thumb(d, small) {
   const n = { speaker: 'speaker', display: 'display', phone: 'iphone', virtual: 'wave' }[d.kind] || 'speaker';
   return `<span class="${cls}"><span class="orb">${ic(n)}</span></span>`;
 }
-const rateNum = (r) => { if (!r) return '—'; const k = r / 1000; return Number.isInteger(k) ? String(k) : k.toFixed(1).replace('.', ','); };
-const ago = (s) => s < 5 ? 'ahora' : s < 60 ? `hace ${s} s` : s < 3600 ? `hace ${Math.floor(s / 60)} min` : `hace ${Math.floor(s / 3600)} h`;
+const rateNum = (r) => { if (!r) return '—'; const k = r / 1000; return Number.isInteger(k) ? String(k) : k.toFixed(1); };
+const ago = (s) => s < 5 ? 'just now' : s < 60 ? `${s} s ago` : s < 3600 ? `${Math.floor(s / 60)} min ago` : `${Math.floor(s / 3600)} h ago`;
 
 window.render = function (state) {
   S = state;
@@ -316,7 +316,7 @@ window.render = function (state) {
 
   // Header
   $('dot').className = 'dot' + (!S.enabled ? ' off' : S.callMode ? ' warn' : '');
-  text($('statusText'), !S.enabled ? 'En pausa' : S.callMode ? 'Modo llamada detectado' : 'Hi-Fi protegido');
+  text($('statusText'), !S.enabled ? 'Paused' : S.callMode ? 'Call mode detected' : 'Hi-Fi protected');
   $('master').classList.toggle('on', S.enabled);
 
   // Hero: one accent colour; orange only when something is wrong.
@@ -329,34 +329,34 @@ window.render = function (state) {
     lane.style.setProperty('--dur', dur + 's');
     lane.classList.toggle('idle', idle);
   }
-  put($('outTag'), ic('speaker') + esc(out ? `${S.outputLink} · ${out.rateLabel.replace('.', ',')}` : '—'));
+  put($('outTag'), ic('speaker') + esc(out ? `${S.outputLink} · ${out.rateLabel}` : '—'));
   $('outTag').classList.toggle('warn', !!out?.callMode);
-  const micText = !inp ? 'Sin micro' : inp.builtin ? 'Micro del Mac' : inp.bt ? 'Micro BT · llamada' : inp.name;
+  const micText = !inp ? 'No mic' : inp.builtin ? 'Mac mic' : inp.bt ? 'BT mic · call' : inp.name;
   put($('micTag'), ic(S.micIsHeadset ? 'mic' : 'laptop') + esc(micText));
   $('micTag').classList.toggle('warn', !!inp?.bt);
   put($('heroArt'), !out ? '' : out.kind === 'headset' ? headset(82, outC, S.micIsHeadset ? micC : '#3a3a3c')
     : out.kind === 'mac' ? `<img class="mac" src="${window.__MAC__}" alt="">`
     : `<span class="thumb" style="width:64px;height:64px">${thumb(out).replace(/^<span class="thumb">|<\/span>$/g, '')}</span>`);
-  text($('heroName'), out?.name || 'Sin salida');
+  text($('heroName'), out?.name || 'No output');
 
   // Stats
   $('stats').classList.toggle('warn', !!out?.callMode);
   text($('sRate'), rateNum(out?.rate));
-  text($('sCh'), out?.stereo ? 'Estéreo' : 'Mono');
+  text($('sCh'), out?.stereo ? 'Stereo' : 'Mono');
   text($('sLink'), S.outputLink);
-  put($('sLinkL'), ic(out?.bt ? 'bt' : 'plug') + 'Enlace');
+  put($('sLinkL'), ic(out?.bt ? 'bt' : 'plug') + 'Link');
 
   // Alert
   let a = '';
   if (S.appHoldsBtMic && S.btMicApps.length) {
     const app = S.btMicApps[0];
-    a = alertCard('warn', `${app} fuerza el micro Bluetooth`,
-      `Por eso los cascos están en modo llamada. En ${app} → Voz y vídeo, pon Dispositivo de entrada en "Predeterminado".`,
-      `Abrir ${app}`, { cmd: 'openApp', name: app });
+    a = alertCard('warn', `${app} is forcing the Bluetooth mic`,
+      `That's why your headset is in call mode. In ${app} → Voice & Video, set Input Device to "Default".`,
+      `Open ${app}`, { cmd: 'openApp', name: app });
   } else if (!S.enabled) {
-    a = alertCard('pause', 'Protección en pausa', 'macOS puede volver a poner los cascos en modo llamada.', 'Activar', { cmd: 'mode', call: false }, 'var(--dim)');
+    a = alertCard('pause', 'Protection paused', 'macOS can put your headset back in call mode.', 'Turn on', { cmd: 'mode', call: false }, 'var(--dim)');
   } else if (S.callMode) {
-    a = alertCard('phone', 'Bluetooth en modo llamada', 'Algo está usando el micro de los cascos. Se arreglará en cuanto lo suelte.');
+    a = alertCard('phone', 'Bluetooth in call mode', 'Something is using the headset mic. This clears as soon as it lets go.');
   }
   put($('alert'), a);
 
@@ -364,8 +364,8 @@ window.render = function (state) {
   $('mode').classList.toggle('call', !S.enabled);
   $('mode').querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', i === (S.enabled ? 0 : 1)));
 
-  deviceRow('out', 'Sonido', out, S.outputs);
-  deviceRow('in', 'Micro', inp, S.inputs);
+  deviceRow('out', 'Output', out, S.outputs);
+  deviceRow('in', 'Mic', inp, S.inputs);
 
   // Priority
   put($('pOut'), S.outputs.map((d, i) => prow(d, i, S.outputs.length, false, out)).join(''));
@@ -373,9 +373,10 @@ window.render = function (state) {
 
   // Settings: switches are long-lived elements, so they slide instead of jumping.
   document.querySelectorAll('[data-opt]').forEach((el) => el.classList.toggle('on', !!S.opts[el.dataset.opt]));
-  text($('fixes'), `${S.fixCount} correcciones en esta sesión`);
+  text($('fixes'), `${S.fixCount} ${S.fixCount === 1 ? 'fix' : 'fixes'} this session`);
+  text($('version'), `v${S.version}`);
 
-  put($('footMsg'), S.lastAction ? `${ic('done')}${esc(S.lastAction.text)} · ${ago(S.lastAction.ago)}` : `${ic('shield')}Sin incidencias`);
+  put($('footMsg'), S.lastAction ? `${ic('done')}${esc(S.lastAction.text)} · ${ago(S.lastAction.ago)}` : `${ic('shield')}No issues`);
 };
 
 function alertCard(icon, title, body, btn, action, color = 'var(--warn)') {
@@ -389,17 +390,17 @@ function deviceRow(key, label, cur, list) {
   $(key + 'Box').classList.toggle('open', open === key);
   $(key + 'Box').querySelector('.drop').classList.toggle('open', open === key);
   put($(key + 'List'), list.map((d) => {
-    const extra = d.btMicOnly ? ['activa el modo llamada'] : d.callMode ? ['modo llamada'] : [];
-    const sub = [d.transport, d.rateLabel.replace('.', ',')].concat(extra).join(' · ');
+    const extra = d.btMicOnly ? ['triggers call mode'] : d.callMode ? ['call mode'] : [];
+    const sub = [d.transport, d.rateLabel].concat(extra).join(' · ');
     return `<button class="opt" data-pick="${key}" data-uid="${esc(d.uid)}">${thumb(d, true)}<span class="meta"><div class="nm">${esc(d.name)}</div>` +
       `<div class="sub${extra.length ? ' warn' : ''}">${esc(sub)}</div></span>${cur && d.uid === cur.uid ? `<span class="check">${ic('check')}</span>` : ''}</button>`;
   }).join(''));
 }
 
 function prow(d, i, n, input, cur) {
-  const sub = d.blocked ? '<div class="sub warn">Bloqueado · modo llamada</div>' : `<div class="sub">${esc(d.transport)} · ${esc(d.rateLabel.replace('.', ','))}</div>`;
+  const sub = d.blocked ? '<div class="sub warn">Blocked · call mode</div>' : `<div class="sub">${esc(d.transport)} · ${esc(d.rateLabel)}</div>`;
   return `<div class="prow"><span class="rank">${i + 1}</span>${thumb(d, true)}<span class="meta"><div class="nm">${esc(d.name)}</div>${sub}</span>` +
-    (cur && d.uid === cur.uid ? '<span class="inuse">En uso</span>' : '') +
+    (cur && d.uid === cur.uid ? '<span class="inuse">In use</span>' : '') +
     `<span class="arrows"><button data-move="-1" data-input="${input}" data-uid="${esc(d.uid)}" ${i === 0 ? 'disabled' : ''}>${ic('up')}</button>` +
     `<button data-move="1" data-input="${input}" data-uid="${esc(d.uid)}" ${i === n - 1 ? 'disabled' : ''}>${ic('down')}</button></span></div>`;
 }
@@ -412,18 +413,18 @@ function setRow(icon, title, sub, key) {
 $('logo').innerHTML = ic('headphones');
 $('quit').innerHTML = ic('power');
 $('macImg').src = window.__MAC__ || '';
-$('sRateL').innerHTML = ic('wave') + 'Frecuencia';
-$('sChL').innerHTML = ic('radio') + 'Canales';
+$('sRateL').innerHTML = ic('wave') + 'Sample rate';
+$('sChL').innerHTML = ic('radio') + 'Channels';
 $('mHifi').innerHTML = ic('wave');
 $('mCall').innerHTML = ic('phone');
 $('g1').innerHTML =
-  setRow('plug', 'Preferir USB al Bluetooth', 'Usa la base o el dongle si está conectado', 'prefer_wired') +
-  setRow('micoff', 'Bloquear micro Bluetooth', 'Evita el modo llamada de los cascos', 'block_bt_mic') +
-  setRow('list', 'Cambio automático', 'Elige por prioridad al conectar algo', 'auto_priority') +
-  setRow('wave', 'Máxima frecuencia', 'Pone USB y cable a su mejor calidad', 'max_rate');
+  setRow('plug', 'Prefer USB over Bluetooth', 'Uses the base or dongle when connected', 'prefer_wired') +
+  setRow('micoff', 'Block Bluetooth mic', 'Keeps your headset out of call mode', 'block_bt_mic') +
+  setRow('list', 'Auto switch', 'Picks by priority when something connects', 'auto_priority') +
+  setRow('wave', 'Highest sample rate', 'Runs USB and wired devices at their best', 'max_rate');
 $('g2').innerHTML =
-  setRow('bell', 'Aviso en pantalla', 'Muestra cada cambio de dispositivo', 'show_hud') +
-  setRow('power', 'Abrir al iniciar sesión', '', 'launch_at_login');
+  setRow('bell', 'On-screen HUD', 'Shows every device change', 'show_hud') +
+  setRow('power', 'Launch at login', '', 'launch_at_login');
 
 function setTab(i) {
   if (i === tab) return;

@@ -67,13 +67,13 @@ pub fn app_name(pid: i32) -> String {
     let mut buf = [0u8; 4096];
     let n = unsafe { proc_pidpath(pid, buf.as_mut_ptr(), buf.len() as u32) };
     if n <= 0 {
-        return "Una app".into();
+        return "An app".into();
     }
     let path = String::from_utf8_lossy(&buf[..n as usize]).into_owned();
     if let Some(app) = path.split('/').find(|s| s.ends_with(".app")) {
         return app.trim_end_matches(".app").to_string();
     }
-    path.rsplit('/').next().unwrap_or("Una app").to_string()
+    path.rsplit('/').next().unwrap_or("An app").to_string()
 }
 
 pub fn activate_app(name: &str) {

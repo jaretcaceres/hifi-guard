@@ -181,7 +181,7 @@ fn main() {
                     }
                 }
                 if args.iter().any(|a| a == "--hud") {
-                    engine.announcements.push(("Modo llamada evitado · micro → A50 Mic".into(), Kind::Headset));
+                    engine.announcements.push(("Call mode avoided · mic → A50 Mic".into(), Kind::Headset));
                 }
             }
 
