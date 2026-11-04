@@ -9,14 +9,14 @@ Your music or game audio turns muffled and mono the moment you join Discord, Zoo
 When any app (Discord, Zoom, a browser…) opens a Bluetooth headset's microphone, macOS switches the headset from A2DP (stereo, 44.1/48 kHz) to the hands-free profile (HFP: mono, 16 kHz). Everything starts sounding like a phone call. HiFi Guard stops that from happening by routing audio sensibly, automatically.
 
 <p align="center">
-  <img src="docs/estado.png" width="300" alt="Status tab: the A50 headset stays on A2DP stereo at 44.1 kHz while the Mac's built-in mic is used">
-  <img src="docs/prioridad.png" width="300" alt="Priority tab: ordered output and input devices, the Bluetooth mic marked as blocked">
-  <img src="docs/ajustes.png" width="300" alt="Settings tab: prefer USB, block Bluetooth mic, automatic switching, highest sample rate, HUD, launch at login">
+  <img src="docs/status.png" width="300" alt="Status tab: the A50 headset stays on A2DP stereo at 44.1 kHz while the Mac's built-in mic is used">
+  <img src="docs/priority.png" width="300" alt="Priority tab: ordered output and input devices, the Bluetooth mic marked as blocked">
+  <img src="docs/settings.png" width="300" alt="Settings tab: prefer USB, block Bluetooth mic, auto switch, highest sample rate, HUD, launch at login">
 </p>
 
 ## Install
 
-Requires macOS 14 or later, on Apple silicon or Intel. The menu is in Spanish for now.
+Requires macOS 14 or later, on Apple silicon or Intel.
 
 1. Download `HiFi-Guard-<version>.zip` from [Releases](https://github.com/jaretcaceres/hifi-guard/releases/latest).
 2. Unzip it and move **HiFi Guard** to Applications.
